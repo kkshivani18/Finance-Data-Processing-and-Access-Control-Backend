@@ -9,4 +9,4 @@ COPY backend/ .
 
 EXPOSE 8000
 
-ENTRYPOINT ["python", "entrypoint.py"]
+ENTRYPOINT ["sh", "-c", "python entrypoint.py"]
