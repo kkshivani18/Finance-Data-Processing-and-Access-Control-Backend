@@ -1,8 +1,7 @@
 import os
 import subprocess
 
-# Get PORT from environment, default to 8000
-port = os.environ.get('PORT', '8000')
+port = os.environ.get('PORT', '8080')
 
 subprocess.call([
     'python', '-m', 'uvicorn',
