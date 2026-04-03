@@ -1,11 +1,17 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from app.models.user import UserLogin, TokenResponse, UserResponse, UserCreate
 from app.middleware.auth import hash_password, verify_password, create_access_token
 from app.services.user_service import UserService
+from app.database.db import get_users_collection
 from app.utils.exceptions import NotFoundException, ValidationException, ConflictException
 from app.utils.validators import validate_email, validate_password as validate_pwd
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+def get_user_service() -> UserService:
+    """Dependency provider for UserService with database collection"""
+    return UserService(get_users_collection())
 
 
 @router.post(
@@ -14,7 +20,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
     status_code=status.HTTP_200_OK,
     summary="User login with email and password",
 )
-async def login(credentials: UserLogin):
+async def login(credentials: UserLogin, user_service: UserService = Depends(get_user_service)):
     """
     Authenticate user with email and password.
     Returns: JWT token to use in Authorization header
@@ -35,7 +41,7 @@ async def login(credentials: UserLogin):
         
         email_normalized = credentials.email.lower().strip()
         
-        user = UserService.get_user_by_email(email_normalized)
+        user = user_service.get_user_by_email(email_normalized)
         
         if not user.get("password_hash"):
             raise HTTPException(
@@ -102,7 +108,7 @@ async def login(credentials: UserLogin):
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user",
 )
-async def register(user_create: UserCreate):
+async def register(user_create: UserCreate, user_service: UserService = Depends(get_user_service)):
     """
     Register a new user.
     """
@@ -110,7 +116,7 @@ async def register(user_create: UserCreate):
         if not user_create.name or not user_create.name.strip():
             raise ValidationException("Name cannot be empty")
         
-        user = UserService.create_user(user_create)
+        user = user_service.create_user(user_create)
         
         access_token = create_access_token(
             user_id=str(user.id),

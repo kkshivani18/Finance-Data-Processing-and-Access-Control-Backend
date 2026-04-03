@@ -15,15 +15,20 @@ from app.utils.exceptions import (
 
 
 class UserService:
-    """Service for user management operations"""
+    """Service for user management operations with dependency injection"""
 
-    @staticmethod
-    def get_collection() -> Collection:
-        """Get users collection"""
-        return get_users_collection()
+    def __init__(self, collection: Collection = None):
+        """
+        Initialize UserService with a MongoDB collection.
+        """
+        self._collection = collection if collection is not None else get_users_collection()
 
-    @staticmethod
-    def create_user(user_create: UserCreate) -> UserResponse:
+    @property
+    def collection(self) -> Collection:
+        """Get the users collection"""
+        return self._collection
+
+    def create_user(self, user_create: UserCreate) -> UserResponse:
         """
         Create a new user during registration.
         
@@ -36,8 +41,6 @@ class UserService:
         """
         from app.middleware.auth import hash_password
         
-        collection = UserService.get_collection()
-
         email_normalized = user_create.email.lower().strip()
         
         if not user_create.name or not user_create.name.strip():
@@ -52,7 +55,7 @@ class UserService:
         if len(user_create.name) > 100:
             raise ValidationException("Name must not exceed 100 characters")
         
-        existing_user = collection.find_one({"email": email_normalized})
+        existing_user = self.collection.find_one({"email": email_normalized})
         if existing_user:
             raise ConflictException("Email already exists")
 
@@ -70,7 +73,7 @@ class UserService:
 
         # insert user
         try:
-            result = collection.insert_one(user_doc)
+            result = self.collection.insert_one(user_doc)
             return UserResponse(
                 email=user_doc["email"],
                 name=user_doc["name"],
@@ -85,8 +88,7 @@ class UserService:
         except Exception as e:
             raise ValidationException("Failed to create user. Please try again later.")
 
-    @staticmethod
-    def create_user_with_password(user_dict: dict) -> dict:
+    def create_user_with_password(self, user_dict: dict) -> dict:
         """
         Create a new user with password hash (for registration).
         
@@ -96,10 +98,8 @@ class UserService:
         Returns:
             Raw user document with _id
         """
-        collection = UserService.get_collection()
-
         # Check email already exists
-        existing_user = collection.find_one({"email": user_dict["email"].lower()})
+        existing_user = self.collection.find_one({"email": user_dict["email"].lower()})
         if existing_user:
             raise ConflictException(f"User with email '{user_dict['email']}' already exists")
 
@@ -114,7 +114,7 @@ class UserService:
         }
 
         try:
-            result = collection.insert_one(user_doc)
+            result = self.collection.insert_one(user_doc)
             user_doc["_id"] = result.inserted_id
             return user_doc
         except DuplicateKeyError:
@@ -122,70 +122,48 @@ class UserService:
         except Exception as e:
             raise ValidationException(f"Failed to create user: {str(e)}")
 
-    @staticmethod
-    def get_user_by_id(user_id: str) -> UserResponse:
+    def get_user_by_id(self, user_id: str) -> UserResponse:
         """
         Get user by ID.
-        
-        Args:
-            user_id: User ID (MongoDB ObjectId as string)
             
         Returns:
             UserResponse with user data
         """
-        collection = UserService.get_collection()
-
         if not ObjectId.is_valid(user_id):
             raise ValidationException(f"Invalid user ID format: {user_id}")
 
-        user = collection.find_one({"_id": ObjectId(user_id)})
+        user = self.collection.find_one({"_id": ObjectId(user_id)})
         if not user:
             raise NotFoundException(f"User with ID '{user_id}' not found")
 
-        user["_id"] = str(user["_id"])
-        return UserResponse(**user)
+        return UserResponse(
+            email=user["email"],
+            name=user["name"],
+            role=user["role"],
+            status=user["status"],
+            id=str(user["_id"]),
+            created_at=user["created_at"],
+            updated_at=user["updated_at"]
+        )
 
-    @staticmethod
-    def get_user_by_email(email: str) -> dict:
+    def get_user_by_email(self, email: str) -> dict:
         """
         Get user by email.
-        Used for authentication - includes password_hash.
-        
-        Args:
-            email: User email
-            
-        Returns:
-            Raw user document if found
-            
-        Raises:
-            NotFoundException: If user not found
         """
-        collection = UserService.get_collection()
-        user = collection.find_one({"email": email.lower()})
+        user = self.collection.find_one({"email": email.lower()})
         if not user:
             raise NotFoundException(f"User with email '{email}' not found")
         return user
 
-    @staticmethod
-    def get_all_users(skip: int = 0, limit: int = 100) -> tuple[List[UserResponse], int]:
+    def get_all_users(self, skip: int = 0, limit: int = 100) -> tuple[List[UserResponse], int]:
         """
         Get all users with pagination.
-        
-        Args:
-            skip: Number of users to skip (for pagination)
-            limit: Maximum number of users to return
-            
-        Returns:
-            Tuple of (list of UserResponse, total count)
         """
-        collection = UserService.get_collection()
-
-        # Get total count
-        total_count = collection.count_documents({})
+        total_count = self.collection.count_documents({})
 
         # Get paginated results
         users = list(
-            collection.find({})
+            self.collection.find({})
             .skip(skip)
             .limit(limit)
             .sort("created_at", -1)
@@ -205,29 +183,17 @@ class UserService:
         
         return user_responses, total_count
 
-    @staticmethod
-    def update_user(user_id: str, user_update: UserUpdate) -> UserResponse:
+    def update_user(self, user_id: str, user_update: UserUpdate) -> UserResponse:
         """
         Update user information.
-        
-        Args:
-            user_id: User ID to update
-            user_update: UserUpdate schema with fields to update
             
         Returns:
             Updated UserResponse
-            
-        Raises:
-            NotFoundException: If user not found
-            ValidationException: If user_id is invalid or update failed
         """
-        collection = UserService.get_collection()
-
         # Validate ObjectId format
         if not ObjectId.is_valid(user_id):
             raise ValidationException(f"Invalid user ID format: {user_id}")
 
-        # Prepare update document
         update_doc = {}
         if user_update.name is not None:
             update_doc["name"] = user_update.name
@@ -236,11 +202,10 @@ class UserService:
         if user_update.status is not None:
             update_doc["status"] = user_update.status.lower()
 
-        # Add updated_at timestamp
         update_doc["updated_at"] = datetime.utcnow()
 
         # Update user
-        result = collection.find_one_and_update(
+        result = self.collection.find_one_and_update(
             {"_id": ObjectId(user_id)},
             {"$set": update_doc},
             return_document=True,
@@ -249,108 +214,74 @@ class UserService:
         if not result:
             raise NotFoundException(f"User with ID '{user_id}' not found")
 
-        result["_id"] = str(result["_id"])
-        return UserResponse(**result)
+        return UserResponse(
+            email=result["email"],
+            name=result["name"],
+            role=result["role"],
+            status=result["status"],
+            id=str(result["_id"]),
+            created_at=result["created_at"],
+            updated_at=result["updated_at"]
+        )
 
-    @staticmethod
-    def delete_user(user_id: str) -> bool:
+    def delete_user(self, user_id: str) -> bool:
         """
-        Delete a user by ID.
-        
-        Args:
-            user_id: User ID to delete
-            
+        Delete a user by ID.    
         Returns:
             True if user was deleted, False otherwise
-            
-        Raises:
-            NotFoundException: If user not found
-            ValidationException: If user_id is invalid
         """
-        collection = UserService.get_collection()
-
         if not ObjectId.is_valid(user_id):
             raise ValidationException(f"Invalid user ID format: {user_id}")
 
         # Delete user
-        result = collection.delete_one({"_id": ObjectId(user_id)})
+        result = self.collection.delete_one({"_id": ObjectId(user_id)})
 
         if result.deleted_count == 0:
             raise NotFoundException(f"User with ID '{user_id}' not found")
 
         return True
 
-    @staticmethod
-    def user_exists_by_id(user_id: str) -> bool:
+    def user_exists_by_id(self, user_id: str) -> bool:
         """
         Check if user exists by ID.
-        
-        Args:
-            user_id: User ID
-            
-        Returns:
-            True if user exists, False otherwise
+        True if user exists, False otherwise
         """
         if not ObjectId.is_valid(user_id):
             return False
 
-        collection = UserService.get_collection()
-        return collection.count_documents({"_id": ObjectId(user_id)}) > 0
+        return self.collection.count_documents({"_id": ObjectId(user_id)}) > 0
 
-    @staticmethod
-    def user_exists_by_email(email: str) -> bool:
+    def user_exists_by_email(self, email: str) -> bool:
         """
         Check if user exists by email.
-        
-        Args:
-            email: User email
-            
-        Returns:
-            True if user exists, False otherwise
         """
-        collection = UserService.get_collection()
-        return collection.count_documents({"email": email.lower()}) > 0
+        return self.collection.count_documents({"email": email.lower()}) > 0
 
-    @staticmethod
-    def change_user_status(user_id: str, status: str) -> UserResponse:
+    def change_user_status(self, user_id: str, status: str) -> UserResponse:
         """
         Change user status (active/inactive).
-        
-        Args:
-            user_id: User ID
-            status: New status (active or inactive)
-            
+    
         Returns:
             Updated UserResponse
         """
         if status.lower() not in ["active", "inactive"]:
             raise ValidationException("Status must be 'active' or 'inactive'")
 
-        return UserService.update_user(
+        return self.update_user(
             user_id,
             UserUpdate(status=status.lower())
         )
 
-    @staticmethod
-    def change_user_role(user_id: str, role: str) -> UserResponse:
+    def change_user_role(self, user_id: str, role: str) -> UserResponse:
         """
         Change user role.
-        
-        Args:
-            user_id: User ID
-            role: New role (viewer, analyst, or admin)
-            
         Returns:
             Updated UserResponse
-            
-        Raises:
-            NotFoundException: If user not found
-            ValidationException: If invalid role or user_id
         """
         if role.lower() not in ["viewer", "analyst", "admin"]:
             raise ValidationException("Role must be 'viewer', 'analyst', or 'admin'")
 
-        return UserService.update_user(
+        return self.update_user(
             user_id,
             UserUpdate(role=role.lower())
         )

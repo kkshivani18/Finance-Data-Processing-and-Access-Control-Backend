@@ -3,6 +3,7 @@ from typing import List
 
 from app.models.user import UserCreate, UserResponse, UserUpdate
 from app.services.user_service import UserService
+from app.database.db import get_users_collection
 from app.middleware.auth import UserContext, get_user_context, check_role
 from app.utils.exceptions import (
     NotFoundException,
@@ -14,6 +15,11 @@ from app.utils.exceptions import (
 router = APIRouter(tags=["Users"])
 
 
+def get_user_service() -> UserService:
+    """Dependency provider for UserService with database collection"""
+    return UserService(get_users_collection())
+
+
 @router.post(
     "",
     response_model=UserResponse,
@@ -23,6 +29,7 @@ router = APIRouter(tags=["Users"])
 async def create_user(
     user_create: UserCreate,
     current_user: UserContext = Depends(get_user_context),
+    user_service: UserService = Depends(get_user_service),
 ):
     """
     Create a new user.
@@ -31,7 +38,7 @@ async def create_user(
     check_role(current_user, ["admin"])
 
     try:
-        user = UserService.create_user(user_create)
+        user = user_service.create_user(user_create)
         return user
     except ConflictException as e:
         raise HTTPException(status_code=409, detail=e.message)
@@ -50,6 +57,7 @@ async def list_users(
     skip: int = Query(0, ge=0, description="Number of users to skip"),
     limit: int = Query(100, ge=1, le=1000, description="Max users to return"),
     current_user: UserContext = Depends(get_user_context),
+    user_service: UserService = Depends(get_user_service),
 ):
     """
     List all users with pagination.
@@ -58,7 +66,7 @@ async def list_users(
     check_role(current_user, ["admin"])
 
     try:
-        users, total = UserService.get_all_users(skip=skip, limit=limit)
+        users, total = user_service.get_all_users(skip=skip, limit=limit)
         return {
             "users": users,
             "total": total,
@@ -78,6 +86,7 @@ async def list_users(
 async def get_user(
     user_id: str,
     current_user: UserContext = Depends(get_user_context),
+    user_service: UserService = Depends(get_user_service),
 ):
     """
     Get a specific user by ID.
@@ -87,7 +96,7 @@ async def get_user(
         raise HTTPException(status_code=403, detail="Forbidden: You can only view your own profile")
 
     try:
-        user = UserService.get_user_by_id(user_id)
+        user = user_service.get_user_by_id(user_id)
         return user
     except NotFoundException as e:
         raise HTTPException(status_code=404, detail=e.message)
@@ -106,6 +115,7 @@ async def update_user(
     user_id: str,
     user_update: UserUpdate,
     current_user: UserContext = Depends(get_user_context),
+    user_service: UserService = Depends(get_user_service),
 ):
     """
     Update a user's information.
@@ -115,7 +125,7 @@ async def update_user(
     check_role(current_user, ["admin"])
 
     try:
-        user = UserService.update_user(user_id, user_update)
+        user = user_service.update_user(user_id, user_update)
         return user
     except NotFoundException as e:
         raise HTTPException(status_code=404, detail=e.message)
@@ -133,6 +143,7 @@ async def update_user(
 async def delete_user(
     user_id: str,
     current_user: UserContext = Depends(get_user_context),
+    user_service: UserService = Depends(get_user_service),
 ):
     """
     Delete a user by ID.
@@ -142,7 +153,7 @@ async def delete_user(
     check_role(current_user, ["admin"])
 
     try:
-        UserService.delete_user(user_id)
+        user_service.delete_user(user_id)
         return None
     except NotFoundException as e:
         raise HTTPException(status_code=404, detail=e.message)
