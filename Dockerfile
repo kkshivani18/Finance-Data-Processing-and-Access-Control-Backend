@@ -8,6 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
 COPY start.py /app/start.py
 
-EXPOSE 8080
-
 CMD ["python", "/app/start.py"]
