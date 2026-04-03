@@ -15,7 +15,6 @@
 - [Running the Application](#running-the-application)
 - [API Documentation](#api-documentation)
 - [Role-Based Access Control](#role-based-access-control)
-- [Database Schema](#database-schema)
 - [Design Decisions & Assumptions](#design-decisions--assumptions)
 - [Key Enhancements](#key-enhancements)
 
@@ -57,58 +56,38 @@ The system allows users with different roles (Viewer, Analyst, Admin) to manage 
 
 ## 🏗️ Architecture
 
-### Backend Structure
+### Multi-Tenancy Design
 
+This application implements a **shared multi-tenancy architecture** where all users share the same database and application instance. This design pattern offers:
+
+**Key Characteristics:**
+- ✅ **Single Database Instance** - All users' data stored in same MongoDB collections
+- ✅ **Data Isolation via User ID** - Records are filtered by `user_id` at the query level
+- ✅ **Role-Based Access Control** - Access enforcement through middleware & route handlers
+- ✅ **Efficient Resource Utilization** - Single backend instance serves multiple users
+- ✅ **Shared Infrastructure** - Cost-effective scaling for teams
+
+**Data Isolation Strategy:**
 ```
-backend/
-├── app/
-│   ├── __init__.py
-│   ├── main.py                 # FastAPI app initialization
-│   ├── middleware/
-│   │   └── auth.py            # JWT authentication & role checks
-│   ├── routes/
-│   │   ├── auth.py            # Login/register endpoints
-│   │   ├── users.py           # User management (admin only)
-│   │   ├── records.py         # Financial records CRUD
-│   │   └── dashboard.py       # Dashboard summary analytics
-│   ├── services/
-│   │   ├── user_service.py    # User business logic
-│   │   ├── record_service.py  # Record operations & validation
-│   │   └── dashboard_service.py  # Analytics & aggregations
-│   ├── models/
-│   │   ├── user.py            # User Pydantic schemas
-│   │   └── financial_record.py # Record schemas with validators
-│   ├── database/
-│   │   └── db.py              # MongoDB connection & initialization
-│   └── utils/
-│       ├── validators.py      # Custom validation functions
-│       └── exceptions.py      # Custom exception classes
-├── requirements.txt
-└── .env                        # Environment variables (not in git)
+Users share:
+├── Single MongoDB cluster
+├── Single backend application
+└── Single frontend deployment
+
+Data segregation happens at:
+├── Query level (WHERE user_id = ?)
+├── Middleware level (JWT token contains user_id)
+└── Route handler level (check_role validation)
 ```
 
-### Frontend Structure
+**Security Implementation:**
+- JWT tokens contain `user_id` - embedded in every request
+- Middleware extracts user context from token
+- Service layer filters all queries by user_id
+- Routes validate user permissions before data access
+- Admin/Analyst roles can bypass user_id filter for authorized operations
 
-```
-frontend/
-├── src/
-│   ├── context/
-│   │   ├── AuthContext.jsx    # Authentication state & login/register logic
-│   │   └── DataContext.jsx    # Dashboard data fetching & caching
-│   ├── pages/
-│   │   ├── LandingPage.jsx    # Login/register forms
-│   │   ├── Dashboard.jsx      # Main dashboard view
-│   │   └── RecordsPage.jsx    # Financial records management
-│   ├── components/
-│   │   └── dashboard/
-│   │       ├── RevenueChart.jsx      # Income vs expense bars
-│   │       ├── SpendingDonut.jsx     # Category breakdown
-│   │       ├── AISummary.jsx         # AI-powered insights
-│   │       ├── RecentActivitySummary.jsx  # Recent transactions
-│   │       └── CalendarView.jsx      # Monthly calendar with balance
-│   └── App.jsx                # Main app with routing
-└── package.json
-```
+---
 
 ### Data Flow
 
@@ -160,13 +139,6 @@ Frontend (Display with error handling)
 - **MongoDB Collections:**
   - `users` - User accounts with roles
   - `financial_records` - Transaction records
-  
-- **Indexes:**
-  - `users.email` (unique)
-  - `financial_records.user_id`
-  - `financial_records.date`
-  - `financial_records.category`
-  - `financial_records.user_id + date` (compound)
 
 ---
 
@@ -672,49 +644,38 @@ check_role(current_user, ["analyst", "admin"])  # Both can view records
 
 ---
 
-## 📊 Database Schema
+## 🎨 Design Decisions & Assumptions
 
-### Users Collection
-```javascript
-{
-  "_id": ObjectId,
-  "email": String (unique),
-  "name": String,
-  "role": String ("viewer" | "analyst" | "admin"),
-  "status": String ("active" | "inactive"),
-  "password_hash": String,
-  "created_at": DateTime,
-  "updated_at": DateTime
-}
+### 0. **Architecture: Multi-Tenancy with Shared Database**
+**Decision:** Implement shared multi-tenancy where all users share the same MongoDB database and application instance  
+**Reasoning:**
+- **Cost-Effective:** Single backend/database serves multiple users
+- **Operational Simplicity:** One application to maintain and deploy
+- **Data Isolation:** User data safely segregated via user_id filtering
+- **Standard Practice:** Common SaaS application pattern
+
+**Implementation Details:**
+- Every `financial_record` has `user_id` field - basis for data isolation
+- JWT middleware extracts `user_id` from token on every request
+- Service layer methods filter queries: `find({"user_id": user_id})`
+- Admin/Analyst can bypass user_id for legitimate business needs
+- Role-based access enforced at middleware level
+
+**Example Query Isolation:**
+```python
+# Viewer/Own user: Can only see their own records
+records = collection.find({"user_id": current_user.user_id})
+
+# Admin/Analyst: Can see all records
+records = collection.find({})  # No user_id filter
 ```
 
-**Indexes:**
-- `email` (unique)
-
-### Financial Records Collection
-```javascript
-{
-  "_id": ObjectId,
-  "user_id": String,
-  "amount": Number,
-  "type": String ("income" | "expense"),
-  "category": String,
-  "date": DateTime,
-  "description": String,
-  "created_at": DateTime,
-  "updated_at": DateTime
-}
-```
-
-**Indexes:**
-- `user_id` (ascending)
-- `date` (descending)
-- `category` (ascending)
-- `user_id + date` (compound)
+**Scalability Path:**
+- Current: Single instance, shared database (suitable for <1M users)
+- Future: Could migrate to database-per-tenant or application-per-tenant if needed
+- Sharding ready: MongoDB collections indexed by user_id for easy sharding
 
 ---
-
-## 🎨 Design Decisions & Assumptions
 
 ### 1. **Database Choice: MongoDB**
 **Decision:** Use MongoDB document database  
@@ -821,58 +782,6 @@ check_role(current_user, ["analyst", "admin"])  # Both can view records
 
 ---
 
-## 📝 Documentation Files
-
-- **[SETUP.md](backend/SETUP.md)** - Detailed setup instructions
-- **[API_DOCS.md](backend/API_DOCS.md)** - Full API reference
-- **[ARCHITECTURE.md](backend/ARCHITECTURE.md)** - System design & decisions
-
----
-
-## 🧪 Testing
-
-### Manual Testing Workflow
-
-```bash
-# 1. Start backend
-cd backend && python -m uvicorn app.main:app --reload
-
-# 2. Start frontend  
-cd frontend && npm run dev
-
-# 3. Test registration
-Register with: test@example.com / TestPass@123
-
-# 4. Test login
-Login with registered credentials
-
-# 5. Test different roles
-- As Analyst: View all records, edit permitted
-- As Admin: Full CRUD access
-
-# 6. Test validation
-- Create expense > income (should fail)
-- Weak password (should fail)
-- Invalid email (should fail)
-```
-
----
-
-## 📈 Future Enhancements
-
-- [ ] Unit & integration tests with pytest
-- [ ] API rate limiting
-- [ ] Search functionality
-- [ ] Soft delete with restore
-- [ ] Bulk upload (CSV)
-- [ ] Email notifications
-- [ ] Two-factor authentication
-- [ ] Audit logging
-- [ ] GraphQL API alternative
-- [ ] Docker containerization
-
----
-
 ## ✅ Checklist: Assignment Requirements
 
 - [x] User & Role Management
@@ -890,15 +799,6 @@ Login with registered credentials
 
 ---
 
-## 📞 Support
-
-For issues or questions:
-1. Check the [API Documentation](#api-documentation)
-2. Review [Design Decisions](#design-decisions--assumptions)
-3. Examine test workflow in [Testing](#testing)
-
----
-
 ## 📄 License
 
 This project is submitted as part of Zorvyn Backend Developer Internship Assessment.
@@ -906,4 +806,4 @@ This project is submitted as part of Zorvyn Backend Developer Internship Assessm
 ---
 
 **Built with ❤️ for evaluation purposes**  
-*Submission Date: April 3, 2026*
+*Submission Date: April 4, 2026*
