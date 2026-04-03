@@ -1,4 +1,3 @@
-"""Authentication Routes - Login and token management"""
 from fastapi import APIRouter, HTTPException, status
 from app.models.user import UserLogin, TokenResponse, UserResponse, UserCreate
 from app.middleware.auth import hash_password, verify_password, create_access_token
@@ -19,10 +18,6 @@ async def login(credentials: UserLogin):
     """
     Authenticate user with email and password.
     Returns: JWT token to use in Authorization header
-    
-    Input Validation:
-    - Email must be valid format
-    - Password must be provided 
     """
     try:
         # Validate inputs

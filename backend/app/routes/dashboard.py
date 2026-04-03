@@ -19,9 +19,7 @@ async def get_dashboard_summary(
     current_user: UserContext = Depends(get_user_context),
 ):
     """
-    Get aggregated dashboard summary data (shared for all users).
-    
-    Accessible by: **Viewer**, **Analyst**, **Admin**
+    Get aggregated dashboard summary data
     """
     try:
         if current_user.role not in ["viewer", "analyst", "admin"]:
@@ -43,15 +41,12 @@ async def get_category_breakdown(
     current_user: UserContext = Depends(get_user_context),
 ):
     """
-    Get category-wise breakdown of expenses/income (shared for all users).
-    
-    Accessible by: **Viewer**, **Analyst**, **Admin**
+    Get category-wise breakdown of expenses/income
     """
     try:
         if current_user.role not in ["viewer", "analyst", "admin"]:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        # Shared dashboard - all users see the same data (organization-wide)
         categories = DashboardService.get_category_wise_totals(user_id=None)
         return {"success": True, "data": categories}
     except Exception as e:
@@ -67,18 +62,14 @@ async def get_monthly_trends(
     current_user: UserContext = Depends(get_user_context),
 ):
     """
-    Get monthly trends (shared for all users - organization-wide data).
-    
-    Accessible by: **Viewer**, **Analyst**, **Admin**
+    Get monthly trends
     """
     try:
         if current_user.role not in ["viewer", "analyst", "admin"]:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        print(f"DEBUG: Getting trends for shared dashboard")
-        # Shared dashboard - all users see the same data (organization-wide)
+        # Shared dashboard 
         trends = DashboardService.get_monthly_trends(user_id=None)
-        print(f"DEBUG: Trends result: {trends}")
         return {"success": True, "data": trends}
     except Exception as e:
         print(f"DEBUG: Error in get_monthly_trends: {str(e)}")
@@ -104,15 +95,10 @@ async def get_weekly_trends(
         if current_user.role not in ["viewer", "analyst", "admin"]:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        print(f"DEBUG: Getting weekly trends for shared dashboard")
-        # Shared dashboard - all users see the same data (organization-wide)
+        # Shared dashboard
         trends = DashboardService.get_weekly_trends(user_id=None)
-        print(f"DEBUG: Weekly trends result: {trends}")
         return {"success": True, "data": trends}
     except Exception as e:
-        print(f"DEBUG: Error in get_weekly_trends: {str(e)}")
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 

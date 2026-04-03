@@ -1,11 +1,6 @@
-"""Dashboard Service - Business logic for dashboard summaries"""
-import logging
 from datetime import datetime, timedelta
-from bson import ObjectId
 from app.database import get_database
 from app.models.dashboard import DashboardSummary, CategoryBreakdown, MonthlyTrend, RecentActivity
-
-logger = logging.getLogger(__name__)
 
 
 class DashboardService:
@@ -120,16 +115,6 @@ class DashboardService:
         # Build match stage - if user_id is None, fetch all records (shared dashboard)
         match_stage = {} if user_id is None else {"user_id": user_id}
 
-        # DEBUG: Check all records in collection
-        all_records = list(records_collection.find({}).limit(10))
-        logger.info(f"[MONTHLY] Sample records in collection: {len(all_records)} found")
-        for i, rec in enumerate(all_records[:3]):
-            logger.info(f"  Record {i}: user_id={rec.get('user_id')}, type={rec.get('type')}, amount={rec.get('amount')}, date={rec.get('date')} (type: {type(rec.get('date'))})")
-
-        user_records = list(records_collection.find(match_stage))
-        for i, rec in enumerate(user_records):
-            logger.info(f"  User Record {i}: amount={rec.get('amount')}, type={rec.get('type')}, date={rec.get('date')}")
-
         # Aggregate by month
         pipeline = [
             {"$match": match_stage},
@@ -153,7 +138,6 @@ class DashboardService:
         try:
             result = list(records_collection.aggregate(pipeline))
         except Exception as e:
-            logger.error(f"[MONTHLY] Aggregation error: {str(e)}")
             result = []
         
         month_map = {}
@@ -176,7 +160,6 @@ class DashboardService:
                 "net": float(income_val - expense_val) if income_val and expense_val else (float(income_val) if income_val else 0.0)
             })
 
-        logger.info(f"[MONTHLY] Final monthly_data: {monthly_data}")
         return monthly_data
 
 
@@ -245,7 +228,7 @@ class DashboardService:
 
     @staticmethod
     def get_recent_activity(user_id: str = None, limit: int = 5) -> list:
-        """Get recent financial activity (shared across all users if user_id is None)"""
+        """Get recent financial activity"""
         db = get_database()
         records_collection = db["financial_records"]
 

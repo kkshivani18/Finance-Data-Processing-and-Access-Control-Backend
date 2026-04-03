@@ -17,7 +17,7 @@ export const DataProvider = ({ children }) => {
     insights: null
   });
   
-  // Records data (shared across analyst and admin)
+  // Records data
   const [records, setRecords] = useState([]);
   
   // Loading and error states
@@ -53,10 +53,6 @@ export const DataProvider = ({ children }) => {
         axios.get(`${API_BASE}/api/dashboard/insights`, config)
       ]);
 
-      console.log('API Response - trends:', trendsRes.data.data);
-      console.log('API Response - weekly:', weeklyRes.data.data);
-      console.log('API Response - insights:', insightsRes.data.data);
-
       const newData = {
         summary: summaryRes.data.data,
         categories: categoriesRes.data.data,
@@ -66,18 +62,18 @@ export const DataProvider = ({ children }) => {
         insights: insightsRes.data.data
       };
 
-      console.log('Setting dashboard data:', newData);
       setDashboardData(newData);
     } catch (err) {
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to load dashboard data';
       setError(prev => ({ ...prev, dashboard: errorMsg }));
+      console.error('Error fetching dashboard data:', err);
       console.error('Error fetching dashboard data:', err);
     } finally {
       setLoading(prev => ({ ...prev, dashboard: false }));
     }
   }, [token, user]);
 
-  // Fetch records - only for analyst and admin
+  // Fetch records
   const fetchRecords = useCallback(async () => {
     if (!token || !user) return;
     
@@ -100,7 +96,6 @@ export const DataProvider = ({ children }) => {
     } catch (err) {
       const errorMsg = 'Failed to fetch records: ' + (err.response?.data?.detail || err.message);
       setError(prev => ({ ...prev, records: errorMsg }));
-      console.error('Error fetching records:', err);
     } finally {
       setLoading(prev => ({ ...prev, records: false }));
     }
@@ -189,29 +184,24 @@ export const DataProvider = ({ children }) => {
     }
   }, [token, user]);
 
-  // Check if user can access records
   const canAccessRecords = useCallback(() => {
     return user?.role === 'analyst' || user?.role === 'admin';
   }, [user]);
 
-  // Check if user can edit records
   const canEditRecords = useCallback(() => {
     return user?.role === 'analyst' || user?.role === 'admin';
   }, [user]);
 
-  // Check if user can delete records (admin only)
   const canDeleteRecords = useCallback(() => {
     return user?.role === 'admin';
   }, [user]);
 
-  // Fetch dashboard data on user change
   useEffect(() => {
     if (user && token) {
       fetchDashboardData();
     }
   }, [user, token, fetchDashboardData]);
 
-  // Fetch records data on user change (if user has access)
   useEffect(() => {
     if (user && token && canAccessRecords()) {
       fetchRecords();
@@ -219,13 +209,11 @@ export const DataProvider = ({ children }) => {
   }, [user, token, canAccessRecords, fetchRecords]);
 
   const value = {
-    // Dashboard data
     dashboardData,
     dashboardLoading: loading.dashboard,
     dashboardError: error.dashboard,
     fetchDashboardData,
 
-    // Records data
     records,
     recordsLoading: loading.records,
     recordsError: error.records,

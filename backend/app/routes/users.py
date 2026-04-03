@@ -1,4 +1,3 @@
-"""User Routes - API endpoints for user management"""
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from typing import List
 
@@ -27,13 +26,6 @@ async def create_user(
 ):
     """
     Create a new user.
-    
-    **Admin only**
-    
-    - **email**: User email (must be unique)
-    - **name**: User full name
-    - **role**: User role (viewer, analyst, or admin)
-    - **status**: User status (active or inactive, default: active)
     """
     # check authorization
     check_role(current_user, ["admin"])
@@ -61,13 +53,6 @@ async def list_users(
 ):
     """
     List all users with pagination.
-    
-    **Admin only**
-    
-    - **skip**: Number of users to skip (default: 0)
-    - **limit**: Max number of users to return (default: 100, max: 1000)
-    
-    Returns paginated list with total count.
     """
     # Check authorization
     check_role(current_user, ["admin"])
@@ -151,11 +136,6 @@ async def delete_user(
 ):
     """
     Delete a user by ID.
-    
-    **Admin only**
-    
-    - **user_id**: MongoDB ObjectId of the user
-    
     Returns 204 No Content on success.
     """
     # Check authorization

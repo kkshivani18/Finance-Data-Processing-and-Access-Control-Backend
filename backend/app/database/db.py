@@ -25,9 +25,7 @@ def get_mongodb_client() -> MongoClient:
         _client = MongoClient(MONGODB_URL)
         try:
             _client.admin.command("ping")
-            print("Connected to MongoDB successfully")
         except Exception as e:
-            print(f"✗ Failed to connect to MongoDB: {e}")
             raise
     return _client
 
@@ -48,7 +46,6 @@ def close_database():
         _client.close()
         _client = None
         _db = None
-        print("MongoDB connection closed")
 
 
 def init_collections():
@@ -58,23 +55,19 @@ def init_collections():
     # Users collection
     if "users" not in db.list_collection_names():
         db.create_collection("users")
-        print("Created 'users' collection")
     
     users_collection = db["users"]
     users_collection.create_index("email", unique=True)
-    print("Created index on users.email (unique)")
 
     # Financial records collection
     if "financial_records" not in db.list_collection_names():
         db.create_collection("financial_records")
-        print(" Created 'financial_records' collection")
     
     records_collection = db["financial_records"]
     records_collection.create_index([("user_id", ASCENDING)])
     records_collection.create_index([("date", ASCENDING)])
     records_collection.create_index([("category", ASCENDING)])
     records_collection.create_index([("user_id", ASCENDING), ("date", ASCENDING)])
-    print("Created indexes on financial_records (user_id, date, category)")
 
 
 def get_users_collection() -> Collection:

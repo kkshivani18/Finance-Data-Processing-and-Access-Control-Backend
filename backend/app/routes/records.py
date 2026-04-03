@@ -1,5 +1,3 @@
-"""Records Routes - API endpoints for financial records"""
-
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from typing import List
 from datetime import datetime
@@ -65,11 +63,6 @@ async def list_records(
 ):
     """
     List financial records based on user role.
-    
-    - **skip**: Number of records to skip (default: 0)
-    - **limit**: Max number of records to return (default: 100, max: 1000)
-    
-    Returns paginated list with total count.
     """
     check_role(current_user, ["viewer", "analyst", "admin"])
     
