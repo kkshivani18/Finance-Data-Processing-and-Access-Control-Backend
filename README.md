@@ -281,6 +281,13 @@ npm run dev
 
 ## 📡 API Documentation
 
+### 🔗 Interactive API Docs
+**Live API:** [https://finance-data-processing-and-access-control-backend-production.up.railway.app/docs](https://finance-data-processing-and-access-control-backend-production.up.railway.app/docs)
+
+The live backend provides interactive Swagger/OpenAPI documentation where you can browse all endpoints, view request/response schemas and test API calls directly.
+
+---
+
 ### Authentication Endpoints
 
 #### POST `/auth/login`
