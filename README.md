@@ -36,6 +36,12 @@ The system allows users with different roles (Viewer, Analyst, Admin) to manage 
 
 ---
 
+## 🎥 Demo
+
+[![Watch Demo](https://img.youtube.com/vi/XX9pHcyQLsM/0.jpg)](https://youtu.be/XX9pHcyQLsM)
+
+---
+
 ## 📊 Assignment Requirement Mapping
 
 | Requirement | Implementation | Status |
